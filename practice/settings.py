@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 
 from pathlib import Path
 from decouple import config
+import re
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -76,8 +78,12 @@ WSGI_APPLICATION = 'practice.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': config("DB_NAME"),
+        "USER": config("DB_USER"),
+        "PASSWORD": config("DB_PW"),
+        "HOST": config("DB_HOST"),
+        "POST": ""
     }
 }
 
@@ -122,3 +128,62 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# adding file logging
+def skip_file_reads(record):
+    pat = re.compile(r'^File .*', flags=re.MULTILINE)
+    if pat.match(record.msg):
+            return False
+    return True
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'skip_file_reads': {
+            '()': 'django.utils.log.CallbackFilter',
+            'callback': skip_file_reads,
+        },
+    },
+    'formatters': {
+        'verbose': {
+            'format': '{name} {levelname} {asctime} {module} {funcName} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {name} {module} {funcName} {asctime} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'djangologfile': {
+            'level':'DEBUG',
+            'class':'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs/django.log'),
+            'maxBytes': 1024*1024*15, # 15MB
+            'backupCount': 10,
+            'formatter': 'simple',
+            'filters': ['skip_file_reads'],
+        },
+        # 'applogfile': {
+        #     'level':'DEBUG',
+        #     'class':'logging.handlers.RotatingFileHandler',
+        #     'filename': os.path.join(BASE_DIR, 'logs/analytics.log'),
+        #     'maxBytes': 1024*1024*15, # 15MB
+        #     'backupCount': 10,
+        #     'formatter': 'verbose',
+        # },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['djangologfile'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        # 'app':{
+        #     'handlers': ['analyticslogfile', 'djangologfile'],
+        #     'level': 'DEBUG',
+        #     'propagate': True,
+        # }
+    },
+}
